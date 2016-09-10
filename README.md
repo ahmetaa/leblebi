@@ -1,4 +1,4 @@
 leblebi
 =======
 
-Spell checking and suggestion library
+Fast dictionary spell suggestion library. Only for edit distance for now.
