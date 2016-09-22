@@ -1,20 +1,17 @@
 package leblebi.spelling;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Stopwatch;
-import com.google.common.io.Resources;
-import leblebi.spelling.SingleWordSpellChecker;
+import leblebi.structure.FloatValueMap;
 import org.junit.Assert;
 import org.junit.Test;
-import zemberek.core.DoubleValueSet;
-import zemberek.core.logging.Log;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 public class SingleWordSpellCheckerTest {
 
@@ -35,19 +32,29 @@ public class SingleWordSpellCheckerTest {
     public void simpleDecodeTest2() {
         SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(1);
         spellChecker.addWords("apple", "apples");
-        DoubleValueSet<String> res = spellChecker.decode("apple");
+        FloatValueMap<String> res = spellChecker.decode("apple");
         for (String re : res) {
             System.out.println(re);
         }
     }
 
     @Test
+    public void simpleDecodeTest3() {
+        SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(1);
+        spellChecker.addWords("apple", "apples");
+        List<SingleWordSpellChecker.Result> res = spellChecker.getSuggestions("apple");
+        for (SingleWordSpellChecker.Result re : res) {
+            System.out.println(re.s);
+        }
+    }
+
+    @Test
     public void multiWordDecodeTest() {
-        Log.setDebug();
+
         SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(1);
         spellChecker.addWords("çak", "sak", "saka", "bak", "çaka", "çakal", "sakal");
 
-        DoubleValueSet<String> result = spellChecker.decode("çak");
+        FloatValueMap<String> result = spellChecker.decode("çak");
 
         Assert.assertEquals(4, result.size());
         assertContainsAll(result, "çak", "sak", "bak", "çaka");
@@ -68,25 +75,25 @@ public class SingleWordSpellCheckerTest {
         Assert.assertEquals(1, result.get("çakal"), delta);
         Assert.assertEquals(1, result.get("çak"), delta);
 
-        Log.setInfo();
     }
 
     @Test
-    public void performanceTest() throws IOException {
-        List<String> words = Resources.readLines(Resources.getResource("10000_frequent_turkish_word"), Charsets.UTF_8);
+    public void performanceTest() throws Exception {
+        Path r = Paths.get(ClassLoader.getSystemResource("10000_frequent_turkish_word").toURI());
+        List<String> words = Files.readAllLines(r, StandardCharsets.UTF_8);
         SingleWordSpellChecker spellChecker = new SingleWordSpellChecker();
         spellChecker.buildDictionary(words);
-        Stopwatch sw = Stopwatch.createStarted();
+        long start = System.currentTimeMillis();
         int solutionCount = 0;
         for (String word : words) {
-            DoubleValueSet<String> result = spellChecker.decode(word);
+            FloatValueMap<String> result = spellChecker.decode(word);
             solutionCount += result.size();
         }
-        Log.info("Elapsed: " + sw.elapsed(TimeUnit.MILLISECONDS));
-        Log.info("Solution count:" + solutionCount);
+        System.out.println("Elapsed: " + (System.currentTimeMillis() - start));
+        System.out.println("Solution count:" + solutionCount);
     }
 
-    void assertContainsAll(DoubleValueSet<String> set, String... words) {
+    void assertContainsAll(FloatValueMap<String> set, String... words) {
         for (String word : words) {
             Assert.assertTrue(set.contains(word));
         }
@@ -95,28 +102,28 @@ public class SingleWordSpellCheckerTest {
     private void check1Distance(SingleWordSpellChecker spellChecker, String expected) {
         Set<String> randomDeleted = randomDelete(expected, 1);
         for (String s : randomDeleted) {
-            DoubleValueSet<String> res = spellChecker.decode(s);
+            FloatValueMap<String> res = spellChecker.decode(s);
             Assert.assertEquals(s, 1, res.size());
             Assert.assertTrue(s, res.contains(expected));
         }
 
         Set<String> randomInserted = randomInsert(expected, 1);
         for (String s : randomInserted) {
-            DoubleValueSet<String> res = spellChecker.decode(s);
+            FloatValueMap<String> res = spellChecker.decode(s);
             Assert.assertEquals(s, 1, res.size());
             Assert.assertTrue(s, res.contains(expected));
         }
 
         Set<String> randomSubstitute = randomSubstitute(expected, 1);
         for (String s : randomSubstitute) {
-            DoubleValueSet<String> res = spellChecker.decode(s);
+            FloatValueMap<String> res = spellChecker.decode(s);
             Assert.assertEquals(s, 1, res.size());
             Assert.assertTrue(s, res.contains(expected));
         }
 
         Set<String> transpositions = transpositions(expected);
         for (String s : transpositions) {
-            DoubleValueSet<String> res = spellChecker.decode(s);
+            FloatValueMap<String> res = spellChecker.decode(s);
             Assert.assertEquals(s, 1, res.size());
             Assert.assertTrue(s, res.contains(expected));
         }
@@ -132,9 +139,9 @@ public class SingleWordSpellCheckerTest {
         Assert.assertTrue(spellChecker.decode(vocabulary).contains(vocabulary));
 
         // "r" is near key "e" therefore it give a smaller penalty.
-        DoubleValueSet<String> res1 = spellChecker.decode("rlma");
+        FloatValueMap<String> res1 = spellChecker.decode("rlma");
         Assert.assertTrue(res1.contains("elma"));
-        DoubleValueSet<String> res2 = spellChecker.decode("ylma");
+        FloatValueMap<String> res2 = spellChecker.decode("ylma");
         Assert.assertTrue(res2.contains("elma"));
         Assert.assertTrue(res1.get("elma") < res2.get("elma"));
 

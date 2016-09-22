@@ -1,8 +1,7 @@
 package leblebi.spelling;
 
-import com.google.common.base.Joiner;
-import zemberek.core.DoubleValueSet;
-import zemberek.core.logging.Log;
+import leblebi.structure.FloatValueMap;
+import leblebi.structure.UIntMap;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -13,14 +12,14 @@ public class SingleWordSpellChecker {
 
     private Node root = new Node(nodeIndexCounter.getAndIncrement(), (char) 0);
 
-    public final double maxPenalty;
+    public final float maxPenalty;
     public final boolean checkNearKeySubstitution;
 
-    static final double INSERTION_PENALTY = 1.0;
-    static final double DELETION_PENALTY = 1.0;
-    static final double SUBSTITUTION_PENALTY = 1.0;
-    static final double NEAR_KEY_SUBSTITUTION_PENALTY = 0.5;
-    static final double TRANSPOSITION_PENALTY = 1.0;
+    static final float INSERTION_PENALTY = 1;
+    static final float DELETION_PENALTY = 1;
+    static final float SUBSTITUTION_PENALTY = 1;
+    static final float NEAR_KEY_SUBSTITUTION_PENALTY = 0.5f;
+    static final float TRANSPOSITION_PENALTY = 1;
 
     public Map<Character, String> nearKeyMap = new HashMap<>();
     public static final Map<Character, String> TURKISH_FQ_NEAR_KEY_MAP = new HashMap<>();
@@ -98,17 +97,17 @@ public class SingleWordSpellChecker {
         TURKISH_Q_NEAR_KEY_MAP.put('w', "qe");
     }
 
-    public SingleWordSpellChecker(double maxPenalty) {
+    public SingleWordSpellChecker(float maxPenalty) {
         this.maxPenalty = maxPenalty;
         this.checkNearKeySubstitution = false;
     }
 
     public SingleWordSpellChecker() {
-        this.maxPenalty = 1.0;
+        this.maxPenalty = 1;
         this.checkNearKeySubstitution = false;
     }
 
-    public SingleWordSpellChecker(double maxPenalty, Map<Character, String> nearKeyMap) {
+    public SingleWordSpellChecker(float maxPenalty, Map<Character, String> nearKeyMap) {
         this.maxPenalty = maxPenalty;
         this.nearKeyMap = Collections.unmodifiableMap(nearKeyMap);
         this.checkNearKeySubstitution = true;
@@ -117,7 +116,7 @@ public class SingleWordSpellChecker {
     public static class Node {
         int index;
         char chr;
-        Map<Character, Node> nodes = new HashMap<>(2);
+        UIntMap<Node> nodes = new UIntMap<>(2);
         String word;
 
         public Node(int index, char chr) {
@@ -126,7 +125,7 @@ public class SingleWordSpellChecker {
         }
 
         public Iterable<Node> getChildNodes() {
-            return nodes.values();
+            return nodes.getValues();
         }
 
         public boolean hasChild(char c) {
@@ -166,8 +165,14 @@ public class SingleWordSpellChecker {
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder("[" + chr);
+            char[] characters = new char[nodes.size()];
+            int[] keys = nodes.getKeyArray();
+            for (int i = 0; i < characters.length; i++) {
+                characters[i] = (char) keys[i];
+            }
+            Arrays.sort(characters);
             if (nodes.size() > 0)
-                sb.append(" children=").append(Joiner.on(",").join(nodes.keySet()));
+                sb.append(" children=").append(Arrays.toString(characters));
             if (word != null)
                 sb.append(" word=").append(word);
             sb.append("]");
@@ -175,7 +180,7 @@ public class SingleWordSpellChecker {
         }
     }
 
-    Locale tr = new Locale("tr");
+    private static final Locale tr = new Locale("tr");
 
     public String process(String str) {
         return str.toLowerCase(tr).replace("['.]", "");
@@ -209,7 +214,7 @@ public class SingleWordSpellChecker {
         return addChar(child, index, word, actual);
     }
 
-    Set<Hypothesis> expand(Hypothesis hypothesis, String input, DoubleValueSet<String> finished) {
+    private Set<Hypothesis> expand(Hypothesis hypothesis, String input, FloatValueMap<String> finished) {
 
         Set<Hypothesis> newHypotheses = new HashSet<>();
 
@@ -220,7 +225,7 @@ public class SingleWordSpellChecker {
             if (hypothesis.node.hasChild(input.charAt(nextIndex))) {
                 Hypothesis hyp = hypothesis.getNewMoveForward(
                         hypothesis.node.getChild(input.charAt(nextIndex)),
-                        0.0,
+                        0,
                         Operation.NE);
                 if (nextIndex >= input.length() - 1) {
                     if (hyp.node.word != null)
@@ -239,7 +244,7 @@ public class SingleWordSpellChecker {
         if (nextIndex < input.length()) {
             for (Node childNode : hypothesis.node.getChildNodes()) {
 
-                double penalty = 0;
+                float penalty = 0;
                 if (checkNearKeySubstitution) {
                     char nextChar = input.charAt(nextIndex);
                     if (childNode.chr != nextChar) {
@@ -296,36 +301,25 @@ public class SingleWordSpellChecker {
         return newHypotheses;
     }
 
-
-    private void addHypothesis(DoubleValueSet<String> result, Hypothesis hypothesis) {
+    private void addHypothesis(FloatValueMap<String> result, Hypothesis hypothesis) {
         String hypWord = hypothesis.node.word;
         if (hypWord == null) {
-            if (Log.isDebug())
-                Log.debug("No word in node:%s", hypothesis.toString());
             return;
         }
         if (!result.contains(hypWord)) {
             result.set(hypWord, hypothesis.penalty);
-            if (Log.isDebug())
-                Log.debug("Hypotesis added:%s", hypothesis.toString());
         } else if (result.get(hypWord) > hypothesis.penalty) {
             result.set(hypWord, hypothesis.penalty);
-            if (Log.isDebug())
-                Log.debug("Hypotesis updated:%s", hypothesis.toString());
         }
     }
 
-    public DoubleValueSet<String> decode(String input) {
+    public FloatValueMap<String> decode(String input) {
         Hypothesis hyp = new Hypothesis(null, root, 0, Operation.N_A);
-        DoubleValueSet<String> hypotheses = new DoubleValueSet<>();
+        FloatValueMap<String> hypotheses = new FloatValueMap<>();
         Set<Hypothesis> next = expand(hyp, input, hypotheses);
         while (true) {
             HashSet<Hypothesis> newHyps = new HashSet<>();
-            if (Log.isDebug())
-                Log.debug("-----------");
             for (Hypothesis hypothesis : next) {
-                if (Log.isDebug())
-                    Log.debug("%s", hypothesis);
                 newHyps.addAll(expand(hypothesis, input, hypotheses));
             }
             if (newHyps.size() == 0)
@@ -333,6 +327,58 @@ public class SingleWordSpellChecker {
             next = newHyps;
         }
         return hypotheses;
+    }
+
+    /**
+     * Returns suggestions sorted by penalty.
+     */
+    public List<Result> getSuggestions(String input) {
+        FloatValueMap<String> results = decode(input);
+
+        List<Result> res = new ArrayList<>(results.size());
+        for (String result : results) {
+            res.add(new Result(result, results.get(result)));
+        }
+        Collections.sort(res);
+        return res;
+    }
+
+    public static class Result implements Comparable<Result> {
+        final String s;
+        final double penalty;
+
+        public Result(String s, double penalty) {
+            this.s = s;
+            this.penalty = penalty;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Result result = (Result) o;
+
+            if (Double.compare(result.penalty, penalty) != 0) return false;
+            if (!s.equals(result.s)) return false;
+
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result;
+            long temp;
+            result = s.hashCode();
+            temp = Double.doubleToLongBits(penalty);
+            result = 31 * result + (int) (temp ^ (temp >>> 32));
+            return result;
+        }
+
+        @Override
+        public int compareTo(Result o) {
+            return Double.compare(penalty, o.penalty);
+        }
     }
 
     enum Operation {
@@ -343,10 +389,10 @@ public class SingleWordSpellChecker {
         Operation operation = Operation.N_A;
         Hypothesis previous;
         Node node;
-        double penalty;
+        float penalty;
         int index;
 
-        Hypothesis(Hypothesis previous, Node node, double penalty, Operation operation) {
+        Hypothesis(Hypothesis previous, Node node, float penalty, Operation operation) {
             this.previous = previous;
             this.node = node;
             this.penalty = penalty;
@@ -365,7 +411,7 @@ public class SingleWordSpellChecker {
             return sb.reverse().toString();
         }
 
-        Hypothesis(Hypothesis previous, Node node, double penalty, int index, Operation operation) {
+        Hypothesis(Hypothesis previous, Node node, float penalty, int index, Operation operation) {
             this.previous = previous;
             this.node = node;
             this.penalty = penalty;
@@ -373,25 +419,25 @@ public class SingleWordSpellChecker {
             this.operation = operation;
         }
 
-        Hypothesis getNew(Node node, double penaltyToAdd, Operation operation) {
+        Hypothesis getNew(Node node, float penaltyToAdd, Operation operation) {
             return new Hypothesis(this, node, this.penalty + penaltyToAdd, index, operation);
         }
 
-        Hypothesis getNewMoveForward(Node node, double penaltyToAdd, Operation operation) {
+        Hypothesis getNewMoveForward(Node node, float penaltyToAdd, Operation operation) {
             return new Hypothesis(this, node, this.penalty + penaltyToAdd, index + 1, operation);
         }
 
-        Hypothesis getNew(Node node, double penaltyToAdd, int index, Operation operation) {
+        Hypothesis getNew(Node node, float penaltyToAdd, int index, Operation operation) {
             return new Hypothesis(this, node, this.penalty + penaltyToAdd, index, operation);
         }
 
-        Hypothesis getNew(double penaltyToAdd, Operation operation) {
+        Hypothesis getNew(float penaltyToAdd, Operation operation) {
             return new Hypothesis(this, this.node, this.penalty + penaltyToAdd, index, operation);
         }
 
         @Override
         public int compareTo(Hypothesis o) {
-            return Double.compare(penalty, o.penalty);
+            return Float.compare(penalty, o.penalty);
         }
 
         @Override
