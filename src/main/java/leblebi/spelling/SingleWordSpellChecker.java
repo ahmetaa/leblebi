@@ -5,6 +5,7 @@ import leblebi.structure.UIntMap;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class SingleWordSpellChecker {
 
@@ -332,22 +333,33 @@ public class SingleWordSpellChecker {
     /**
      * Returns suggestions sorted by penalty.
      */
-    public List<Result> getSuggestions(String input) {
+    public List<ScoredString> getSuggestionsWithScores(String input) {
         FloatValueMap<String> results = decode(input);
 
-        List<Result> res = new ArrayList<>(results.size());
+        List<ScoredString> res = new ArrayList<>(results.size());
         for (String result : results) {
-            res.add(new Result(result, results.get(result)));
+            res.add(new ScoredString(result, results.get(result)));
         }
         Collections.sort(res);
         return res;
     }
 
-    public static class Result implements Comparable<Result> {
-        final String s;
-        final double penalty;
+    public List<String> getSuggestions(String input) {
+        return decode(input).getKeyList();
+    }
 
-        public Result(String s, double penalty) {
+    public List<String> getSuggestionsSorted(String input) {
+        List<ScoredString> s = getSuggestionsWithScores(input);
+        List<String> result = new ArrayList<>(s.size());
+        result.addAll(s.stream().map(s1 -> s1.s).collect(Collectors.toList()));
+        return result;
+    }
+
+    public static class ScoredString implements Comparable<ScoredString> {
+        final String s;
+        final float penalty;
+
+        public ScoredString(String s, float penalty) {
             this.s = s;
             this.penalty = penalty;
         }
@@ -357,9 +369,9 @@ public class SingleWordSpellChecker {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
 
-            Result result = (Result) o;
+            ScoredString result = (ScoredString) o;
 
-            if (Double.compare(result.penalty, penalty) != 0) return false;
+            if (Float.compare(result.penalty, penalty) != 0) return false;
             if (!s.equals(result.s)) return false;
 
             return true;
@@ -370,14 +382,14 @@ public class SingleWordSpellChecker {
             int result;
             long temp;
             result = s.hashCode();
-            temp = Double.doubleToLongBits(penalty);
+            temp = Float.floatToIntBits(penalty);
             result = 31 * result + (int) (temp ^ (temp >>> 32));
             return result;
         }
 
         @Override
-        public int compareTo(Result o) {
-            return Double.compare(penalty, o.penalty);
+        public int compareTo(ScoredString o) {
+            return Float.compare(penalty, o.penalty);
         }
     }
 

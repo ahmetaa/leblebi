@@ -42,8 +42,8 @@ public class SingleWordSpellCheckerTest {
     public void simpleDecodeTest3() {
         SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(1);
         spellChecker.addWords("apple", "apples");
-        List<SingleWordSpellChecker.Result> res = spellChecker.getSuggestions("apple");
-        for (SingleWordSpellChecker.Result re : res) {
+        List<SingleWordSpellChecker.ScoredString> res = spellChecker.getSuggestionsWithScores("apple");
+        for (SingleWordSpellChecker.ScoredString re : res) {
             System.out.println(re.s);
         }
     }
@@ -81,7 +81,7 @@ public class SingleWordSpellCheckerTest {
     public void performanceTest() throws Exception {
         Path r = Paths.get(ClassLoader.getSystemResource("10000_frequent_turkish_word").toURI());
         List<String> words = Files.readAllLines(r, StandardCharsets.UTF_8);
-        SingleWordSpellChecker spellChecker = new SingleWordSpellChecker();
+        SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(2);
         spellChecker.buildDictionary(words);
         long start = System.currentTimeMillis();
         int solutionCount = 0;
