@@ -81,7 +81,7 @@ public class SingleWordSpellCheckerTest {
     public void performanceTest() throws Exception {
         Path r = Paths.get(ClassLoader.getSystemResource("10000_frequent_turkish_word").toURI());
         List<String> words = Files.readAllLines(r, StandardCharsets.UTF_8);
-        SingleWordSpellChecker spellChecker = new SingleWordSpellChecker(2);
+        SingleWordSpellChecker spellChecker = new SingleWordSpellChecker();
         spellChecker.buildDictionary(words);
         long start = System.currentTimeMillis();
         int solutionCount = 0;
